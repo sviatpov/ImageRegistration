@@ -10,7 +10,7 @@ import cv2
 
 class ECC():
 
-    def __init__(self, learning_rate=1.5, iter=100, Rt=cv2.getRotationMatrix2D((0,0), 0, 1.0)):
+    def __init__(self, learning_rate=1.8, iter=200, Rt=cv2.getRotationMatrix2D((0,0), 0, 1.0)):
         # initial rotation
         self.rt = Rt
 
@@ -19,7 +19,7 @@ class ECC():
 
         self.iter = iter
 
-        self.method = "Translation"
+        self.method = "Euclidian"
         self.table_of_method = {"Euclidian" : self.jacobi_euclidian,
                                 "Rotation" : self.derivation_rotation,
                                 "Translation" : self.jajacobi_translation}
@@ -27,19 +27,6 @@ class ECC():
     def set_method(self, m):
         if m in self.table_of_method:
             self.method = m
-
-    @staticmethod
-    def build_pyr(im):
-        pyramid = []
-        pyramid.append(
-            cv2.GaussianBlur(im, (5, 5), sigmaY=0, sigmaX=0, borderType=cv2.BORDER_REFLECT))
-        sz = len(im)
-        while sz > 64:
-            tmp = cv2.GaussianBlur(pyramid[-1], (5, 5), sigmaY=0, sigmaX=0, borderType=cv2.BORDER_REFLECT)
-            tmp = tmp[::2, ::2]
-            pyramid.append(tmp)
-            sz = len(tmp)
-        return pyramid
 
     @staticmethod
     def derivation_rotation(gx, gy, rt, shape):
@@ -196,7 +183,7 @@ class ECC():
         gy = cv2.Sobel(g, cv2.CV_16SC1, 0, 1, ksize=5, borderType=cv2.BORDER_REFLECT)
         gx = cv2.Sobel(g, cv2.CV_16SC1, 1, 0, ksize=5, borderType=cv2.BORDER_REFLECT)
 
-        for i in range(100):
+        for i in range(self.iter):
             ## Warp source image
             ## [R | T] @ Im, It means:
             ##  Imnew[Xnew, Ynew] = Im[X, Y]
@@ -236,24 +223,31 @@ class ECC():
             elif self.method == "Rotation":
                 self.update(rt, dtheta=drt[0][0])
 
+def build_pyr(im):
+    pyramid = []
+    pyramid.append(
+        cv2.GaussianBlur(im, (5, 5), sigmaY=0, sigmaX=0, borderType=cv2.BORDER_REFLECT))
+    sz = len(im)
+    while sz > 64:
+        tmp = cv2.GaussianBlur(pyramid[-1], (5, 5), sigmaY=0, sigmaX=0, borderType=cv2.BORDER_REFLECT)
+        tmp = tmp[::2, ::2]
+        pyramid.append(tmp)
+        sz = len(tmp)
+    return pyramid
+
 def save(im, path):
     im = np.abs(im)
     im = np.array(im, dtype='float64') / np.max(im) * 255.
     cv2.imwrite(path, np.array(im, dtype='uint8'))
 if __name__ == "__main__":
 
-    source = cv2.imread("data/simple/src.png", cv2.IMREAD_GRAYSCALE)
-    target = cv2.imread("data/simple/tar.png", cv2.IMREAD_GRAYSCALE)
-
+    # get image for test
+    source = cv2.imread("data/complex/eyfel_src.png", cv2.IMREAD_GRAYSCALE)
+    target = cv2.imread("data/complex/eyfel_tar.png", cv2.IMREAD_GRAYSCALE)
     source = np.array(source, dtype='float64') / 255.
     target = np.array(target, dtype='float64') / 255.
 
+    # main routine
     ecc = ECC()
     ecc.align(source, target)
-    # for im in ecc.pyramid_tar:
-    #     normilize_image(im, "/home/svipov/Documents/projects/ECC/data/res_")
-
-    # cv2.imshow("dv", normilize_image(pattern))
-    # cv2.imshow("sdf", normilize_image(warped-pattern))
-    # cv2.waitKey()
 
